@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chess Studio</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:20px 12px;background:#171a20;color:#f1f3f5;font-family:Arial,sans-serif;text-align:center}
+h1{margin:8px 0;font-size:30px;letter-spacing:1px}
+.subtitle{color:#aeb6c2;margin-bottom:20px}
+#status{margin:15px auto;padding:12px;max-width:520px;background:#292f39;border-radius:10px;font-weight:bold}
+#board-area{position:relative;z-index:20;background:#171a20;padding:1px 0 10px}
+body.analysis-mode #board-area{position:sticky;top:0;padding:5px 0 9px;box-shadow:0 8px 18px rgba(0,0,0,.35)}
+body.analysis-mode #status{margin:5px auto 8px;padding:8px;font-size:13px}
+.board{position:relative;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));grid-template-rows:repeat(8,minmax(0,1fr));width:min(92vw,520px);aspect-ratio:1;margin:0 auto;border:3px solid #343b46;overflow:hidden}
+body.analysis-mode .board{width:min(68vw,360px)}
+.square{border:none;border-radius:0;margin:0;padding:0;min-width:0;min-height:0;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative}
+.light{background:#e5d5b8}.dark{background:#77936e}
+.piece-svg{width:88%;height:88%;display:block;overflow:visible;pointer-events:none}
+.selected{background:#e6c84c!important}
+.legal:after{content:"";width:24%;height:24%;border-radius:50%;background:rgba(20,25,20,.35);position:absolute}
+.last-move{background:#b8bd65}
+#best-arrow-layer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:10;overflow:visible}
+.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;max-width:520px;margin:20px auto}
+.control{height:52px;display:flex;align-items:center;justify-content:center;gap:9px;padding:0 10px;border:1px solid #465264;border-radius:12px;background:linear-gradient(145deg,#3b4657,#2b3441);color:white;font-size:14px;font-weight:bold;box-shadow:0 3px 7px rgba(0,0,0,.22);cursor:pointer}
+.control:active{transform:scale(.97);background:#52647d}
+.control svg{width:19px;height:19px;flex-shrink:0}
+#engine.active,#analyze-button{background:linear-gradient(145deg,#477b59,#31583e);border-color:#639875}
+.settings{max-width:520px;margin:20px auto;display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:left}
+.setting label{display:block;margin-bottom:7px;color:#aeb6c2;font-size:13px}
+.setting select{width:100%;height:46px;padding:0 10px;border:1px solid #465264;border-radius:10px;background:#292f39;color:white;font-size:14px}
+#moves{max-width:520px;margin:15px auto;padding:12px;background:#222832;border-radius:10px;text-align:left;min-height:50px;line-height:1.8;overflow-wrap:anywhere}
+#analyze-button{max-width:520px;width:100%;margin:12px auto}
+#analysis-section{max-width:520px;margin:22px auto;text-align:left}
+#analysis-section[hidden],#analyze-button[hidden]{display:none}
+.analysis-card{background:#222832;border:1px solid #394454;border-radius:12px;padding:14px;margin-bottom:12px}
+.analysis-title{font-size:19px;font-weight:bold;margin-bottom:10px}
+#analysis-progress{color:#b9c4d3;line-height:1.5}
+.progress-track{height:8px;background:#11151b;border-radius:10px;overflow:hidden;margin-top:12px}
+#progress-fill{height:100%;width:0%;background:#6b9b78;transition:width .2s}
+#analysis-summary{line-height:1.7;color:#cbd3df}
+.analysis-row{background:#292f39;border:1px solid #414c5c;border-radius:10px;padding:11px;margin-top:9px}
+.analysis-row-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.analysis-move{font-weight:bold}
+.analysis-grade{font-size:12px;font-weight:bold;padding:5px 8px;border-radius:7px;background:#3b4657}
+.grade-best{color:#8ee0a3}.grade-good{color:#a9d8ed}.grade-inaccurate{color:#f2d477}.grade-mistake{color:#ffad70}.grade-blunder{color:#ff8585}
+.analysis-detail{color:#b9c4d3;font-size:13px;line-height:1.6}
+.analysis-actions{display:flex;gap:8px;margin-top:9px}
+.analysis-actions button,.replay-controls button,#analysis-nav button{flex:1;min-height:40px;padding:8px;border:1px solid #465264;border-radius:9px;background:#394556;color:white;font-size:12px;font-weight:bold;cursor:pointer}
+.replay-controls{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:12px}
+#replay-label{margin-top:10px;color:#cbd3df;font-size:13px;text-align:center}
+#analysis-nav{display:none;max-width:520px;margin:8px auto 0;gap:7px;grid-template-columns:repeat(4,minmax(0,1fr))}
+body.analysis-mode #analysis-nav{display:grid}
+#analysis-nav button{min-height:39px;padding:6px 3px}
+#analysis-nav button:disabled{opacity:.35}
+#analysis-nav-label{grid-column:1/-1;color:#cbd3df;font-size:12px;text-align:center}
+.analysis-toggle{display:flex;align-items:center;justify-content:center;gap:9px;margin:10px auto;color:#dce5ef;font-size:13px}
+.analysis-toggle input{width:18px;height:18px;accent-color:#6b9b78}
+#evaluation-graph{width:100%;height:180px;display:block;background:#171c24;border-radius:9px}
+.graph-point{cursor:pointer}
+.critical-item{padding:9px;margin-top:7px;border-radius:8px;background:#292f39;cursor:pointer;font-size:13px}
+.variation{padding:9px;margin-top:7px;background:#292f39;border-radius:8px;font-size:13px;line-height:1.5}
+#try-status{font-size:13px;color:#b9c4d3;text-align:center;margin-top:8px}
+@media(min-width:600px){.controls{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* Eröffnungsbuch */
+#opening-book-button{max-width:520px;width:100%;margin:0 auto 18px;background:linear-gradient(145deg,#536b91,#35465f);border-color:#7189ad}
+#opening-book{position:fixed;inset:0;z-index:1000;background:#171a20;overflow-y:auto;padding:18px 12px 35px}
+#opening-book[hidden]{display:none}
+.opening-wrap{max-width:620px;margin:0 auto}
+.opening-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 auto 16px;max-width:520px}
+.opening-top h2{font-size:22px;margin:0}
+.opening-top button,.opening-action{min-height:42px;padding:9px 13px;border:1px solid #465264;border-radius:10px;background:#394556;color:white;font-weight:bold;cursor:pointer}
+.opening-intro{color:#aeb6c2;line-height:1.5;margin:0 auto 16px;max-width:520px}
+.opening-list{display:grid;gap:10px;max-width:520px;margin:0 auto}
+.opening-choice{width:100%;text-align:left;padding:15px;border:1px solid #465264;border-radius:12px;background:#252d38;color:#f1f3f5;cursor:pointer}
+.opening-choice strong{display:block;font-size:16px;margin-bottom:6px}
+.opening-choice span{display:block;color:#b9c4d3;font-size:13px;line-height:1.45}
+#opening-study[hidden],#opening-select[hidden]{display:none}
+#opening-description{max-width:520px;margin:0 auto 12px;padding:13px;background:#222832;border-radius:10px;text-align:left;line-height:1.55;color:#d1d9e4}
+#opening-board{width:min(92vw,520px);margin:0 auto 14px}
+#opening-status{max-width:520px;margin:0 auto 10px;color:#b9c4d3;font-size:13px}
+#opening-moves{max-width:520px;margin:0 auto 12px;padding:12px;background:#222832;border-radius:10px;text-align:left;line-height:1.9;min-height:50px;overflow-wrap:anywhere}
+.opening-current{color:#ffe28a;font-weight:bold;text-decoration:underline}
+.opening-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;max-width:520px;margin:0 auto 12px}
+.opening-controls button{min-height:46px;border:1px solid #465264;border-radius:10px;background:#394556;color:white;font-weight:bold;cursor:pointer}
+.opening-controls button:disabled{opacity:.35;cursor:default}
+#opening-explanation{max-width:520px;margin:0 auto;padding:13px;background:#222832;border:1px solid #394454;border-radius:10px;text-align:left;line-height:1.55;color:#d1d9e4}
+#opening-back-list{margin:0 auto 12px;display:block;width:min(100%,520px)}
+</style>
+</head>
+<body>
+<h1>CHESS STUDIO</h1>
+<div class="subtitle">Dein Schachbrett</div>
+<button class="control" id="opening-book-button">📖 Eröffnungsbuch</button>
+
+<div id="board-area">
+ <div id="status">Schachpartie wird geladen ...</div>
+ <div id="board" class="board"></div>
+ <div id="analysis-nav">
+  <button id="nav-prev">← Zurück</button>
+  <button id="nav-next">Weiter →</button>
+  <button id="nav-played">Gespielt</button>
+  <button id="nav-best">Bester Zug</button>
+  <div id="analysis-nav-label">Wähle einen Zug aus der Analyse.</div>
+ </div>
+</div>
+
+<div class="controls">
+ <button class="control" id="undo">↶ Zurück</button>
+ <button class="control" id="reset">＋ Neue Partie</button>
+ <button class="control" id="flip">⇅ Brett drehen</button>
+ <button class="control" id="engine" aria-pressed="false">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+   <rect x="3" y="4" width="18" height="13" rx="2"/>
+   <path d="M8 21h8M12 17v4"/>
+  </svg>
+  <span id="engine-label">Computer AUS</span>
+ </button>
+</div>
+
+<div class="settings">
+ <div class="setting"><label for="difficulty">Spielstärke</label>
+  <select id="difficulty">
+   <option value="0">Anfänger</option><option value="5">Casual</option>
+   <option value="10" selected>Fortgeschritten</option><option value="15">Experte</option><option value="20">Meister</option>
+  </select>
+ </div>
+ <div class="setting"><label for="style">Spielstil</label>
+  <select id="style">
+   <option value="balanced">Ausgewogen</option><option value="aggressive" selected>Aggressiv</option><option value="very-aggressive">Sehr aggressiv</option>
+  </select>
+ </div>
+</div>
+
+<div id="moves">Noch keine Züge</div>
+<button class="control" id="analyze-button" hidden>Partie analysieren</button>
+
+<section id="analysis-section" hidden>
+ <div class="analysis-card">
+  <div class="analysis-title">Partieanalyse</div>
+  <div id="analysis-progress">Warte auf die Analyse ...</div>
+  <div class="progress-track"><div id="progress-fill"></div></div>
+ </div>
+ <div class="analysis-card" id="analysis-summary-card" hidden>
+  <div class="analysis-title">Ergebnis</div><div id="analysis-summary"></div>
+ </div>
+ <div class="analysis-card" id="graph-card" hidden>
+  <div class="analysis-title">Bewertungsverlauf</div>
+  <svg id="evaluation-graph" viewBox="0 0 500 180" preserveAspectRatio="none"></svg>
+  <div class="analysis-detail">Die Kurve zeigt den ungefähren Vorteil für Weiß. Tippe auf einen Punkt, um den Zug anzusehen.</div>
+ </div>
+ <div class="analysis-card" id="critical-card" hidden>
+  <div class="analysis-title">Schlüsselmomente</div><div id="critical-list"></div>
+ </div>
+ <div class="analysis-card" id="replay-card" hidden>
+  <div class="analysis-title">Züge nachspielen</div>
+  <div class="replay-controls">
+   <button id="replay-prev">← Vorheriger Zug</button><button id="replay-next">Nächster Zug →</button>
+   <button id="replay-final">Endstellung zeigen</button><button id="replay-best">Besseren Zug zeigen</button>
+  </div>
+  <label class="analysis-toggle"><input type="checkbox" id="best-arrows"> Beste-Zug-Pfeile anzeigen</label>
+  <div class="analysis-actions">
+   <button id="try-best">Zug ausprobieren</button><button id="exit-try">Ausprobieren beenden</button>
+  </div>
+  <div id="try-status"></div>
+  <div id="replay-label"></div>
+ </div>
+ <div class="analysis-card" id="variation-card" hidden>
+  <div class="analysis-title">Engine-Varianten</div><div id="variation-list"></div>
+ </div>
+ <div class="analysis-card" id="analysis-list-card" hidden>
+  <div class="analysis-title">Alle Züge</div><div id="analysis-list"></div>
+ </div>
+</section>
+
+<!-- Eigenständige Ansicht des Eröffnungsbuchs. Die laufende Partie bleibt unangetastet. -->
+<section id="opening-book" hidden>
+ <div class="opening-wrap">
+  <div class="opening-top">
+   <h2>📖 Eröffnungsbuch</h2>
+   <button id="opening-close">Schließen ✕</button>
+  </div>
+  <div id="opening-select">
+   <p class="opening-intro">Wähle eine Eröffnung aus. Du kannst anschließend Zug für Zug durch die typische Zugfolge gehen und dir die Stellung sowie Erklärungen ansehen.</p>
+   <div class="opening-list" id="opening-list"></div>
+  </div>
+  <div id="opening-study" hidden>
+   <button class="opening-action" id="opening-back-list">← Zurück zur Eröffnungsauswahl</button>
+   <div id="opening-description"></div>
+   <div id="opening-status"></div>
+   <div id="opening-board" class="board"></div>
+   <div id="opening-moves"></div>
+   <div class="opening-controls">
+    <button id="opening-prev">← Zurück</button>
+    <button id="opening-next">Weiter →</button>
+   </div>
+   <div id="opening-explanation"></div>
+  </div>
+ </div>
+</section>
+
+<script type="module">
+import {Chess} from "https://cdn.jsdelivr.net/npm/chess.js@1.4.0/+esm";
+
+const chess=new Chess(),$=id=>document.getElementById(id);
+const boardElement=$("board"),statusElement=$("status"),movesElement=$("moves");
+const engineButton=$("engine"),engineLabel=$("engine-label");
+const difficultySelect=$("difficulty"),styleSelect=$("style");
+const analyzeButton=$("analyze-button"),analysisSection=$("analysis-section");
+const analysisProgress=$("analysis-progress"),progressFill=$("progress-fill");
+const analysisSummaryCard=$("analysis-summary-card"),analysisSummary=$("analysis-summary");
+const replayCard=$("replay-card"),replayLabel=$("replay-label");
+const analysisListCard=$("analysis-list-card"),analysisList=$("analysis-list");
+
+let selectedSquare=null,legalMoves=[],flipped=false,lastMove=null;
+let engine=null,engineReady=false,engineThinking=false,vsComputer=false;
+let engineCandidates={},searchDepth=0;
+let analysisState=null,analysisResults=[];
+let replayFen=null,replayLastMove=null,replayIndex=-1,replayStatus="",replayMode="played";
+let showBestArrows=false,tryMode=false,tryChess=null;
+
+/* Separater Zustand für die Pfeilsuche */
+let arrowSearch=null;
+let arrowSearchToken=0;
+let bestArrowMove=null;
+let arrowSearchTimer=null;
+
+/* Stockfish-Loader – Originalmethode */
+async function startStockfishWorker(){
+ try{
+  const workerUrl=new URL("./stockfish-19-lite-single.js",location.href);
+  const wasmUrl=new URL("./stockfish-19-lite-single.wasm",location.href);
+  const response=await fetch(workerUrl.href);
+  if(!response.ok)throw new Error("Stockfish-JavaScript konnte nicht geladen werden: HTTP "+response.status);
+  let workerCode=await response.text();
+  const streamingCode="WebAssembly.instantiateStreaming(t,e)";
+  if(!workerCode.includes(streamingCode))throw new Error("Die erwartete Stockfish-Ladefunktion wurde nicht gefunden.");
+  workerCode=workerCode.replace(streamingCode,"t.arrayBuffer().then(function(bytes){return WebAssembly.instantiate(bytes,e)})");
+  const workerBlob=new Blob([workerCode],{type:"text/javascript"});
+  const workerBlobUrl=URL.createObjectURL(workerBlob)+"#"+encodeURIComponent(wasmUrl.href);
+  engine=new Worker(workerBlobUrl);
+
+  engine.onmessage=event=>{
+   const line=event.data;
+   if(typeof line!=="string")return;
+
+   if(line==="uciok"){engine.postMessage("isready");return;}
+   if(line==="readyok"){
+    engineReady=true;
+    render();
+    if(vsComputer&&chess.turn()==="b")startEngineMove();
+    else if(showBestArrows)requestBestArrow();
+    return;
+   }
+
+   /* Pfeilsuche hat Vorrang vor normaler Engine-Steuerung */
+   if(arrowSearch){
+    if(line.startsWith("bestmove")){
+     finishArrowSearch(line);
+     return;
+    }
+    return;
+   }
+
+   if(analysisState){
+    handleAnalysisInfo(line);
+    if(line.startsWith("bestmove"))handleAnalysisBestMove(line);
+    return;
+   }
+
+   handleEngineInfo(line);
+   if(line.startsWith("bestmove")){
+    engineThinking=false;
+    if(!vsComputer||chess.turn()!=="b"){render();return;}
+    const fallback=line.split(/\s+/)[1];
+    let chosen=styleSelect.value==="balanced"?fallback:chooseAggressiveMove(fallback);
+    if(chosen&&chosen!=="(none)")try{
+     const move=chess.move({from:chosen.slice(0,2),to:chosen.slice(2,4),promotion:chosen[4]||"q"});
+     if(move)lastMove=move;
+    }catch(e){console.log(e);}
+    engineCandidates={};searchDepth=0;render();
+   }
+  };
+
+  engine.onerror=event=>{
+   statusElement.textContent="Stockfish-Fehler: "+(event.message||"Worker-Fehler");
+   engineReady=false;engineThinking=false;arrowSearch=null;
+  };
+
+  engine.postMessage("uci");
+  setTimeout(()=>{if(!engineReady)statusElement.textContent="Stockfish antwortet nicht. Bitte Dateien prüfen.";},12000);
+ }catch(error){
+  console.error(error);
+  statusElement.textContent="Stockfish-Startfehler: "+error.message;
+ }
+}
+startStockfishWorker();
+
+function handleEngineInfo(line){
+ if(!line.startsWith("info "))return;
+ const d=Number((line.match(/\bdepth (\d+)/)||[])[1]||0);
+ const mp=Number((line.match(/\bmultipv (\d+)/)||[])[1]||1);
+ const pv=(line.match(/\bpv ([a-h][1-8][a-h][1-8][qrbn]?)/)||[])[1];
+ const cp=(line.match(/\bscore cp (-?\d+)/)||[])[1];
+ const mate=(line.match(/\bscore mate (-?\d+)/)||[])[1];
+ if(!pv)return;
+ if(d<searchDepth)return;
+ if(d>searchDepth){searchDepth=d;engineCandidates={};}
+ const score=cp!==undefined?Number(cp):mate!==undefined?(Number(mate)>0?100000:-100000):null;
+ if(score!==null)engineCandidates[mp]={move:pv,score,depth:d};
+}
+
+function chooseAggressiveMove(fallback){
+ const candidates=Object.values(engineCandidates);
+ if(!candidates.length)return fallback;
+ let best=fallback,bestScore=-Infinity;
+ candidates.forEach(c=>{
+  let m;
+  try{m=chess.move({from:c.move.slice(0,2),to:c.move.slice(2,4),promotion:c.move[4]||"q"});}catch(e){return;}
+  if(!m)return;
+  let bonus=0;
+  if(m.flags.includes("c")||m.flags.includes("e"))bonus+=25;
+  if(m.san.includes("+"))bonus+=45;
+  if(m.san.includes("#"))bonus+=100000;
+  if(m.promotion)bonus+=60;
+  chess.undo();
+  const score=c.score+bonus*(styleSelect.value==="very-aggressive"?2:1);
+  if(score>bestScore){bestScore=score;best=c.move;}
+ });
+ return best;
+}
+
+function gameStatus(){
+ if(chess.isCheckmate())return "SCHACHMATT! "+(chess.turn()==="w"?"Schwarz":"Weiß")+" gewinnt!";
+ if(chess.isStalemate())return "PATT! Remis.";
+ if(chess.isThreefoldRepetition())return "REMIS durch Stellungswiederholung.";
+ if(chess.isInsufficientMaterial())return "REMIS – nicht genügend Material.";
+ if(chess.isDraw())return "REMIS!";
+ if(engineThinking&&vsComputer)return "Stockfish denkt ...";
+ const player=chess.turn()==="w"?"Weiß":"Schwarz";
+ if(chess.isCheck())return player+" steht im SCHACH!";
+ if(vsComputer&&chess.turn()==="b")return "Stockfish ist am Zug";
+ return vsComputer?"Du bist am Zug (Weiß)":player+" ist am Zug";
+}
+
+function pieceSvg(piece){
+ const white=piece.color==="w",fill=white?"#ffffff":"#171717",stroke=white?"#292929":"#000000",type=piece.type;
+ const shapes={
+ k:`<path d="M46 9 H54 V19 H64 V27 H54 V34 H69 L74 83 H26 L31 34 H46 V27 H36 V19 H46 Z"/><path d="M20 84 H80 V94 H20 Z"/>`,
+ q:`<path d="M24 38 L36 55 L50 32 L64 55 L76 38 L69 79 H31 Z"/><circle cx="24" cy="31" r="7"/><circle cx="50" cy="24" r="7"/><circle cx="76" cy="31" r="7"/><path d="M20 80 H80 V94 H20 Z"/>`,
+ r:`<path d="M24 20 H36 V31 H44 V20 H56 V31 H64 V20 H76 V39 H70 L75 80 H25 L30 39 H24 Z"/><path d="M20 81 H80 V94 H20 Z"/>`,
+ b:`<path d="M50 12 C35 22 38 38 50 45 C35 51 31 64 35 80 H65 C69 64 65 51 50 45 C62 38 65 22 50 12 Z"/><path d="M20 81 H80 V94 H20 Z"/><path d="M43 28 L57 42" fill="none"/>`,
+ n:`<path d="M24 81 C28 67 25 54 35 42 C43 31 54 22 70 17 L77 30 L66 39 L74 48 L68 61 L75 81 Z"/><circle cx="62" cy="28" r="2.8"/><path d="M20 81 H80 V94 H20 Z"/>`,
+ p:`<circle cx="50" cy="25" r="14"/><path d="M42 39 H58 L62 52 C65 61 69 69 70 81 H30 C31 69 35 61 38 52 Z"/><path d="M20 81 H80 V94 H20 Z"/>`
+ };
+ return `<svg class="piece-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><g fill="${fill}" stroke="${stroke}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">${shapes[type]}</g></svg>`;
+}
+
+/* Koordinaten beziehen sich auf die tatsächliche Brettfläche inklusive Rahmen */
+function squareCoordinates(square){
+ let file="abcdefgh".indexOf(square[0]),rank=8-Number(square[1]);
+ if(flipped){file=7-file;rank=7-rank;}
+ const rect=boardElement.getBoundingClientRect();
+ const border=parseFloat(getComputedStyle(boardElement).borderLeftWidth)||0;
+ const inner=rect.width-border*2;
+ const cell=inner/8;
+ return{
+  x:border+(file+.5)*cell,
+  y:border+(rank+.5)*cell,
+  size:rect.width
+ };
+}
+
+function drawBestArrow(){
+ const old=boardElement.querySelector("#best-arrow-layer");
+ if(old)old.remove();
+
+ if(!showBestArrows||!bestArrowMove)return;
+
+ const a=squareCoordinates(bestArrowMove.slice(0,2));
+ const b=squareCoordinates(bestArrowMove.slice(2,4));
+ const svg=document.createElementNS("http://www.w3.org/2000/svg","svg");
+ svg.id="best-arrow-layer";
+ svg.setAttribute("viewBox",`0 0 ${a.size} ${a.size}`);
+ svg.setAttribute("preserveAspectRatio","none");
+
+ const dx=b.x-a.x,dy=b.y-a.y;
+ const length=Math.sqrt(dx*dx+dy*dy);
+ if(!length)return;
+
+ /* Pfeilspitze endet vor der Mitte des Zielfeldes */
+ const ux=dx/length,uy=dy/length;
+ const endX=b.x-ux*12,endY=b.y-uy*12;
+ const startX=a.x+ux*12,startY=a.y+uy*12;
+
+ const ns="http://www.w3.org/2000/svg";
+ const defs=document.createElementNS(ns,"defs");
+ const marker=document.createElementNS(ns,"marker");
+ marker.setAttribute("id","best-arrow-head");
+ marker.setAttribute("markerWidth","8");
+ marker.setAttribute("markerHeight","8");
+ marker.setAttribute("refX","6");
+ marker.setAttribute("refY","3");
+ marker.setAttribute("orient","auto");
+ marker.setAttribute("markerUnits","userSpaceOnUse");
+ const head=document.createElementNS(ns,"path");
+ head.setAttribute("d","M0 0 L6 3 L0 6 Z");
+ head.setAttribute("fill","#20bd65");
+ marker.appendChild(head);defs.appendChild(marker);svg.appendChild(defs);
+
+ const line=document.createElementNS(ns,"line");
+ line.setAttribute("x1",startX);line.setAttribute("y1",startY);
+ line.setAttribute("x2",endX);line.setAttribute("y2",endY);
+ line.setAttribute("stroke","#20bd65");
+ line.setAttribute("stroke-width",Math.max(5,a.size*.018));
+ line.setAttribute("stroke-linecap","round");
+ line.setAttribute("marker-end","url(#best-arrow-head)");
+ line.setAttribute("opacity",".95");
+ svg.appendChild(line);
+ boardElement.appendChild(svg);
+}
+
+/* Aktuelle angezeigte Stellung bestimmen */
+function getDisplayedFen(){
+ if(tryMode&&tryChess)return tryChess.fen();
+ if(replayFen!==null)return replayFen;
+ return chess.fen();
+}
+
+/* Pfeilsuche für genau die Stellung, die gerade auf dem Brett steht */
+function requestBestArrow(){
+ if(!showBestArrows)return;
+ if(!engine||!engineReady||analysisState||engineThinking)return;
+
+ const fen=getDisplayedFen();
+ const token=++arrowSearchToken;
+ bestArrowMove=null;
+ drawBestArrow();
+
+ if(arrowSearchTimer)clearTimeout(arrowSearchTimer);
+
+ /* Verhindert, dass zwei Suchläufe gleichzeitig gestartet werden */
+ if(arrowSearch){
+  arrowSearch.pendingFen=fen;
+  arrowSearch.pendingToken=token;
+  engine.postMessage("stop");
+  return;
+ }
+
+ beginArrowSearch(fen,token);
+}
+
+function beginArrowSearch(fen,token){
+ if(!showBestArrows||!engine||!engineReady)return;
+ arrowSearch={fen,token};
+ engine.postMessage("position fen "+fen);
+ engine.postMessage("go depth 13");
+}
+
+function finishArrowSearch(line){
+ const finished=arrowSearch;
+ arrowSearch=null;
+ if(!finished)return;
+
+ const parts=line.trim().split(/\s+/);
+ const move=parts[1];
+ const currentFen=getDisplayedFen();
+
+ if(finished.token===arrowSearchToken&&finished.fen===currentFen&&move&&move!=="(none)"){
+  bestArrowMove=move;
+  drawBestArrow();
+ }
+
+ /* Falls während der Suche eine andere Stellung gewählt wurde */
+ if(finished.pendingFen&&showBestArrows){
+  beginArrowSearch(finished.pendingFen,finished.pendingToken);
+  return;
+ }
+
+ if(showBestArrows&&finished.token!==arrowSearchToken){
+  requestBestArrow();
+ }
+}
+
+function cancelArrowSearch(){
+ arrowSearchToken++;
+ bestArrowMove=null;
+ if(arrowSearchTimer)clearTimeout(arrowSearchTimer);
+ arrowSearchTimer=null;
+ if(arrowSearch&&engine){
+  arrowSearch.pendingFen=null;
+  engine.postMessage("stop");
+ }
+ drawBestArrow();
+}
+
+function render(){
+ boardElement.innerHTML="";
+ const viewGame=replayFen!==null?new Chess(replayFen):chess;
+ const position=viewGame.board(),rows=flipped?[...position].reverse():position;
+ const shownLast=replayFen!==null?replayLastMove:lastMove;
+
+ rows.forEach((row,ri)=>{
+  const squares=flipped?[...row].reverse():row;
+  squares.forEach((piece,ci)=>{
+   const rr=flipped?7-ri:ri,rc=flipped?7-ci:ci,sq="abcdefgh"[rc]+(8-rr);
+   const el=document.createElement("button");
+   el.className="square";el.type="button";
+   el.classList.add((rr+rc)%2===0?"light":"dark");
+   if((replayFen===null||tryMode)&&selectedSquare===sq)el.classList.add("selected");
+   if((replayFen===null||tryMode)&&legalMoves.includes(sq))el.classList.add("legal");
+   if(shownLast&&(shownLast.from===sq||shownLast.to===sq))el.classList.add("last-move");
+   if(piece)el.innerHTML=pieceSvg(piece);
+   el.addEventListener("click",()=>clickSquare(sq));
+   boardElement.appendChild(el);
+  });
+ });
+
+ statusElement.textContent=replayFen!==null?
+  (tryMode?"Ausprobieren · "+(tryChess.isCheckmate()?"Schachmatt":tryChess.isCheck()?"Schach":"Eigene Analysezüge"):replayStatus):
+  gameStatus();
+
+ const history=chess.history();
+ if(!history.length)movesElement.textContent="Noch keine Züge";
+ else{
+  let t="";
+  for(let i=0;i<history.length;i+=2){
+   t+=(Math.floor(i/2)+1)+". "+history[i];
+   if(history[i+1])t+=" "+history[i+1];
+   t+="   ";
+  }
+  movesElement.textContent=t;
+ }
+
+ analyzeButton.hidden=!chess.isGameOver()||!!analysisState;
+ analyzeButton.textContent=analysisResults.length?"Erneut analysieren":"Partie analysieren";
+
+ drawBestArrow();
+}
+
+function applyEngineSettings(){
+ if(!engine||!engineReady)return;
+ engine.postMessage("setoption name Skill Level value "+Number(difficultySelect.value));
+ engine.postMessage("setoption name MultiPV value "+(styleSelect.value==="aggressive"?3:styleSelect.value==="very-aggressive"?5:1));
+}
+
+function startEngineMove(){
+ if(!engine||!engineReady){statusElement.textContent="Stockfish wird noch geladen ...";return;}
+ if(!vsComputer||engineThinking||chess.turn()!=="b"||chess.isGameOver())return;
+ cancelArrowSearch();
+ applyEngineSettings();
+ engineCandidates={};searchDepth=0;engineThinking=true;selectedSquare=null;legalMoves=[];
+ render();
+ engine.postMessage("position fen "+chess.fen());
+ engine.postMessage("go movetime 1200");
+}
+
+function clickSquare(sq){
+ if(tryMode&&tryChess){
+  const piece=tryChess.get(sq);
+  if(selectedSquare){
+   if(legalMoves.includes(sq)){
+    try{
+     const m=tryChess.move({from:selectedSquare,to:sq,promotion:"q"});
+     if(m){
+      replayFen=tryChess.fen();replayLastMove=m;
+      selectedSquare=null;legalMoves=[];
+      $("try-status").textContent="Ausprobierter Zug: "+m.san;
+      render();
+      if(showBestArrows)requestBestArrow();
+     }
+    }catch(e){console.log(e);}
+    return;
+   }
+   if(piece&&piece.color===tryChess.turn()){selectTrySquare(sq);return;}
+   selectedSquare=null;legalMoves=[];render();return;
+  }
+  if(piece&&piece.color===tryChess.turn())selectTrySquare(sq);
+  return;
+ }
+
+ if(chess.isGameOver()||engineThinking||replayFen!==null||analysisState)return;
+ if(vsComputer&&chess.turn()==="b")return;
+ const piece=chess.get(sq);
+
+ if(selectedSquare){
+  if(legalMoves.includes(sq)){makeMove(selectedSquare,sq);return;}
+  if(piece&&piece.color===chess.turn()){selectSquare(sq);return;}
+  selectedSquare=null;legalMoves=[];render();return;
+ }
+ if(piece&&piece.color===chess.turn())selectSquare(sq);
+}
+
+function selectTrySquare(sq){
+ selectedSquare=sq;
+ legalMoves=tryChess.moves({square:sq,verbose:true}).map(m=>m.to);
+ render();
+}
+function selectSquare(sq){
+ selectedSquare=sq;
+ legalMoves=chess.moves({square:sq,verbose:true}).map(m=>m.to);
+ render();
+}
+
+function makeMove(from,to){
+ cancelArrowSearch();
+ try{
+  const m=chess.move({from,to,promotion:"q"});
+  if(m)lastMove=m;
+ }catch(e){console.log(e);}
+ selectedSquare=null;legalMoves=[];render();
+ if(vsComputer&&chess.turn()==="b"&&!chess.isGameOver())startEngineMove();
+}
+
+/* Partieanalyse */
+function startGameAnalysis(){
+ if(!chess.isGameOver())return;
+ if(!engine||!engineReady){
+  analysisSection.hidden=false;
+  analysisProgress.textContent="Stockfish wird noch geladen. Bitte warte kurz.";
+  return;
+ }
+ if(analysisState)return;
+
+ cancelArrowSearch();
+
+ const history=chess.history({verbose:true});
+ if(!history.length)return;
+ const replay=new Chess(),moves=[];
+
+ history.forEach((m,index)=>{
+  const beforeFen=replay.fen();
+  replay.move({from:m.from,to:m.to,promotion:m.promotion});
+  const afterFen=replay.fen();
+  moves.push({
+   beforeFen,afterFen,from:m.from,to:m.to,promotion:m.promotion,
+   color:m.color,san:m.san,uci:m.from+m.to+(m.promotion||""),
+   moveNumber:Math.floor(index/2)+1,ply:index
+  });
+ });
+
+ analysisResults=[];
+ replayFen=null;replayLastMove=null;replayIndex=-1;replayMode="played";
+ analysisSection.hidden=false;
+
+ ["analysis-summary-card","graph-card","critical-card","replay-card","variation-card","analysis-list-card"].forEach(id=>$(id).hidden=true);
+
+ analysisProgress.textContent="Stockfish untersucht die Partie ...";
+ progressFill.style.width="0%";
+
+ analysisState={
+  moves,index:0,phase:"best",bestMove:null,bestScore:null,
+  currentScore:null,currentDepth:0,variations:{}
+ };
+
+ engineThinking=false;
+ engine.postMessage("setoption name Skill Level value 20");
+ engine.postMessage("setoption name MultiPV value 3");
+ runAnalysisSearch();
+ render();
+}
+
+function runAnalysisSearch(){
+ if(!analysisState||!engine)return;
+ const a=analysisState,item=a.moves[a.index];
+ if(!item)return;
+
+ a.currentScore=null;a.currentDepth=0;a.variations={};
+ engine.postMessage("setoption name MultiPV value "+(a.phase==="best"?3:1));
+ engine.postMessage("position fen "+(a.phase==="best"?item.beforeFen:item.afterFen));
+ engine.postMessage("go movetime 900");
+
+ progressFill.style.width=(a.index/a.moves.length*100)+"%";
+ analysisProgress.textContent="Analysiere Zug "+(a.index+1)+" von "+a.moves.length+" · "+(a.phase==="best"?"Suche beste Züge ...":"Prüfe gespielten Zug ...");
+}
+
+function handleAnalysisInfo(line){
+ const a=analysisState;
+ if(!a||!line.startsWith("info ")||/\b(lowerbound|upperbound)\b/.test(line))return;
+
+ const depth=Number((line.match(/\bdepth (\d+)/)||[])[1]||0);
+ const mp=Number((line.match(/\bmultipv (\d+)/)||[])[1]||1);
+ const cp=(line.match(/\bscore cp (-?\d+)/)||[])[1];
+ const mate=(line.match(/\bscore mate (-?\d+)/)||[])[1];
+ const pv=(line.match(/\bpv ((?:[a-h][1-8][a-h][1-8][qrbn]?\s*)+)/)||[])[1];
+
+ if(cp===undefined&&mate===undefined)return;
+
+ const score=cp!==undefined?Number(cp):Number(mate)>0?30000-Math.abs(Number(mate)):-30000+Math.abs(Number(mate));
+ const old=a.variations[mp];
+ if(!old||depth>=old.depth)a.variations[mp]={score,depth,pv:pv||""};
+ if(mp===1&&depth>=a.currentDepth){a.currentDepth=depth;a.currentScore=score;}
+}
+
+function classifyMove(loss){
+ if(loss<=15)return{label:"Bester Zug",css:"grade-best"};
+ if(loss<=40)return{label:"Gut",css:"grade-good"};
+ if(loss<=90)return{label:"Ungenau",css:"grade-inaccurate"};
+ if(loss<=200)return{label:"Fehler",css:"grade-mistake"};
+ return{label:"Grober Fehler",css:"grade-blunder"};
+}
+
+function handleAnalysisBestMove(line){
+ const a=analysisState;
+ if(!a)return;
+ const item=a.moves[a.index];
+ if(!item)return;
+
+ if(a.phase==="best"){
+  const bm=line.split(/\s+/)[1];
+  a.bestMove=bm&&bm!=="(none)"?bm:null;
+  a.bestScore=a.currentScore;
+  a.bestVariations=Object.values(a.variations).sort((x,y)=>y.score-x.score);
+  a.phase="played";
+  runAnalysisSearch();
+  return;
+ }
+
+ const played=a.currentScore===null?null:-a.currentScore,best=a.bestScore;
+ let loss=best!==null&&played!==null?Math.max(0,best-played):0;
+ if(a.bestMove===item.uci)loss=0;
+
+ const grade=classifyMove(loss);
+ analysisResults.push({
+  ...item,bestMove:a.bestMove,bestScore:best,playedScore:played,
+  loss,label:grade.label,css:grade.css,variations:a.bestVariations||[]
+ });
+
+ a.index++;
+ if(a.index>=a.moves.length)finishGameAnalysis();
+ else{
+  a.phase="best";a.bestMove=null;a.bestScore=null;
+  runAnalysisSearch();
+ }
+}
+
+function finishGameAnalysis(){
+ analysisState=null;
+ document.body.classList.add("analysis-mode");
+ progressFill.style.width="100%";
+ analysisProgress.textContent="Analyse abgeschlossen! "+analysisResults.length+" Züge untersucht.";
+
+ const counts={"Bester Zug":0,"Gut":0,"Ungenau":0,"Fehler":0,"Grober Fehler":0};
+ analysisResults.forEach(r=>counts[r.label]++);
+
+ analysisSummary.innerHTML=Object.entries(counts).map(([k,v])=>`<div>${k}: <strong>${v}</strong></div>`).join("")+
+ `<p style="font-size:12px;color:#9daaba">Die Einstufung basiert auf dem Bewertungsunterschied zwischen dem besten gefundenen Zug und dem gespielten Zug. Sie ist eine Näherung und keine offizielle Chess.com-Bewertung.</p>`;
+
+ ["analysis-summary-card","graph-card","critical-card","replay-card","variation-card","analysis-list-card"].forEach(id=>$(id).hidden=false);
+
+ renderAnalysisList();
+ renderEvaluationGraph();
+ renderCriticalMoves();
+ renderVariations(0);
+ applyEngineSettings();
+ updateAnalysisNavigation();
+ render();
+
+ if(showBestArrows)requestBestArrow();
+}
+
+function renderAnalysisList(){
+ analysisList.innerHTML="";
+ analysisResults.forEach((r,i)=>{
+  const row=document.createElement("div");row.className="analysis-row";
+  const top=document.createElement("div");top.className="analysis-row-top";
+  const name=document.createElement("span");name.className="analysis-move";
+  name.textContent=r.moveNumber+(r.color==="w"?". ":"... ")+r.san;
+  const grade=document.createElement("span");grade.className="analysis-grade "+r.css;
+  grade.textContent=r.label;top.append(name,grade);
+
+  const detail=document.createElement("div");detail.className="analysis-detail";
+  detail.textContent="Bester Zug: "+(r.bestMove?r.bestMove.slice(0,2)+" → "+r.bestMove.slice(2,4):"Nicht verfügbar")+" · Verlust: "+Math.round(r.loss)+" Centipawns";
+
+  const actions=document.createElement("div");actions.className="analysis-actions";
+  const played=document.createElement("button");played.textContent="Stellung ansehen";
+  played.onclick=()=>{exitTryMode();showPlayedMove(i);$("board-area").scrollIntoView({behavior:"smooth",block:"start"});};
+  const best=document.createElement("button");best.textContent="Besseren Zug zeigen";
+  best.onclick=()=>{exitTryMode();showBestMove(i);$("board-area").scrollIntoView({behavior:"smooth",block:"start"});};
+
+  actions.append(played,best);row.append(top,detail,actions);analysisList.appendChild(row);
+ });
+}
+
+function renderEvaluationGraph(){
+ const svg=$("evaluation-graph");svg.innerHTML="";
+ const values=analysisResults.map(r=>Math.max(-1000,Math.min(1000,r.playedScore===null?0:(r.color==="w"?r.playedScore:-r.playedScore))));
+ const pts=values.map((v,i)=>({x:20+i/Math.max(1,values.length-1)*460,y:90-v*.065,i}));
+
+ const zero=document.createElementNS("http://www.w3.org/2000/svg","line");
+ zero.setAttribute("x1",10);zero.setAttribute("x2",490);
+ zero.setAttribute("y1",90);zero.setAttribute("y2",90);
+ zero.setAttribute("stroke","#657184");zero.setAttribute("stroke-dasharray","5 5");
+ svg.appendChild(zero);
+
+ const path=document.createElementNS("http://www.w3.org/2000/svg","polyline");
+ path.setAttribute("points",pts.map(p=>p.x+","+p.y).join(" "));
+ path.setAttribute("fill","none");path.setAttribute("stroke","#72c98b");
+ path.setAttribute("stroke-width",3);svg.appendChild(path);
+
+ pts.forEach(p=>{
+  const c=document.createElementNS("http://www.w3.org/2000/svg","circle");
+  c.setAttribute("cx",p.x);c.setAttribute("cy",p.y);c.setAttribute("r",5);
+  c.setAttribute("fill","#a4e5b4");c.setAttribute("class","graph-point");
+  c.onclick=()=>{
+   exitTryMode();showPlayedMove(p.i);
+   $("board-area").scrollIntoView({behavior:"smooth",block:"start"});
+  };
+  svg.appendChild(c);
+ });
+}
+
+function renderCriticalMoves(){
+ const list=$("critical-list");list.innerHTML="";
+ const critical=analysisResults.map((r,i)=>({...r,index:i})).filter(r=>r.loss>=90);
+ if(!critical.length){list.textContent="Keine größeren Fehler in dieser Partie gefunden.";return;}
+
+ critical.forEach(r=>{
+  const el=document.createElement("div");el.className="critical-item";
+  el.textContent=r.moveNumber+". "+r.san+" – "+r.label+" ("+Math.round(r.loss)+" cp)";
+  el.onclick=()=>{
+   exitTryMode();showPlayedMove(r.index);
+   $("board-area").scrollIntoView({behavior:"smooth",block:"start"});
+  };
+  list.appendChild(el);
+ });
+}
+
+function renderVariations(index){
+ const list=$("variation-list");list.innerHTML="";
+ const r=analysisResults[index];if(!r)return;
+
+ r.variations.forEach((v,i)=>{
+  const el=document.createElement("div");el.className="variation";
+  const moves=v.pv.trim().split(/\s+/).slice(0,8).join(" ");
+  el.textContent=(i+1)+". Bewertung "+(v.score/100).toFixed(2)+" · "+moves;
+  list.appendChild(el);
+ });
+ if(!list.children.length)list.textContent="Keine Varianten verfügbar.";
+}
+
+function showReplayPosition(index){
+ if(!analysisResults.length)return;
+ cancelArrowSearch();
+
+ index=Math.max(0,Math.min(index,analysisResults.length-1));
+ const r=analysisResults[index];
+ replayFen=r.afterFen;replayLastMove={from:r.from,to:r.to};
+ replayIndex=index;replayMode="played";
+ replayStatus="Analyse · Zug "+r.moveNumber+(r.color==="w"?" Weiß":" Schwarz")+": "+r.san;
+ replayLabel.textContent=replayStatus;
+ renderVariations(index);updateAnalysisNavigation();render();
+ if(showBestArrows)requestBestArrow();
+}
+
+function showSuggestedMove(index){
+ const r=analysisResults[index];if(!r?.bestMove)return;
+ cancelArrowSearch();
+
+ try{
+  const preview=new Chess(r.beforeFen);
+  const m=preview.move({from:r.bestMove.slice(0,2),to:r.bestMove.slice(2,4),promotion:r.bestMove[4]||"q"});
+  if(!m)return;
+
+  replayFen=preview.fen();replayLastMove=m;
+  replayIndex=index;replayMode="best";
+  replayStatus="Stockfish-Vorschlag für Zug "+r.moveNumber+": "+m.san;
+  replayLabel.textContent=replayStatus;
+  renderVariations(index);updateAnalysisNavigation();render();
+  if(showBestArrows)requestBestArrow();
+ }catch(e){console.error(e);}
+}
+
+function showPlayedMove(i){replayMode="played";showReplayPosition(i);}
+function showBestMove(i){replayMode="best";showSuggestedMove(i);}
+
+function updateAnalysisNavigation(){
+ $("nav-prev").disabled=replayIndex<0;
+ $("nav-next").disabled=replayIndex>=analysisResults.length-1;
+ $("nav-played").disabled=replayIndex<0;
+ $("nav-best").disabled=replayIndex<0||!analysisResults[replayIndex]?.bestMove;
+ $("nav-played").style.background=replayMode==="played"?"#477b59":"#394556";
+ $("nav-best").style.background=replayMode==="best"?"#477b59":"#394556";
+ $("analysis-nav-label").textContent=replayStatus||"Wähle einen Zug aus der Analyse.";
+}
+
+function startTryMode(){
+ if(replayIndex<0)return;
+ cancelArrowSearch();
+ const r=analysisResults[replayIndex];
+ tryChess=new Chess(r.beforeFen);
+ tryMode=true;replayFen=tryChess.fen();replayLastMove=null;
+ selectedSquare=null;legalMoves=[];
+ $("try-status").textContent="Du kannst jetzt selbst Züge ausprobieren. Die Originalpartie bleibt unverändert.";
+ render();
+ if(showBestArrows)requestBestArrow();
+}
+
+function exitTryMode(){
+ if(!tryMode)return;
+ cancelArrowSearch();
+ tryMode=false;tryChess=null;selectedSquare=null;legalMoves=[];
+ $("try-status").textContent="";
+ if(replayIndex>=0){
+  if(replayMode==="best")showBestMove(replayIndex);
+  else showPlayedMove(replayIndex);
+ }else{
+  replayFen=null;replayLastMove=null;render();
+  if(showBestArrows)requestBestArrow();
+ }
+}
+
+$("nav-prev").onclick=()=>{
+ if(replayIndex>0)showPlayedMove(replayIndex-1);
+ else if(replayIndex===0){
+  cancelArrowSearch();
+  replayFen=analysisResults[0].beforeFen;replayLastMove=null;
+  replayIndex=-1;replayStatus="Ausgangsstellung";
+  replayLabel.textContent=replayStatus;updateAnalysisNavigation();render();
+  if(showBestArrows)requestBestArrow();
+ }
+};
+$("nav-next").onclick=()=>{if(replayIndex<analysisResults.length-1)showPlayedMove(replayIndex+1);};
+$("nav-played").onclick=()=>{if(replayIndex>=0)showPlayedMove(replayIndex);};
+$("nav-best").onclick=()=>{if(replayIndex>=0)showBestMove(replayIndex);};
+
+$("replay-prev").onclick=$("nav-prev").onclick;
+$("replay-next").onclick=$("nav-next").onclick;
+
+$("replay-final").onclick=()=>{
+ exitTryMode();cancelArrowSearch();
+ replayFen=null;replayLastMove=null;replayIndex=-1;replayMode="played";
+ replayStatus="Endstellung der Partie";replayLabel.textContent=replayStatus;
+ updateAnalysisNavigation();render();
+ if(showBestArrows)requestBestArrow();
+};
+
+$("replay-best").onclick=()=>{
+ if(replayIndex>=0)showBestMove(replayIndex);
+ else if(analysisResults.length)showBestMove(0);
+};
+
+$("best-arrows").onchange=e=>{
+ showBestArrows=e.target.checked;
+ cancelArrowSearch();
+ if(showBestArrows)requestBestArrow();
+ else drawBestArrow();
+};
+
+$("try-best").onclick=startTryMode;
+$("exit-try").onclick=exitTryMode;
+analyzeButton.onclick=startGameAnalysis;
+
+function cancelAnalysis(){
+ if(analysisState&&engine){
+  engine.postMessage("stop");
+  analysisState=null;
+ }
+}
+
+function clearAnalysis(){
+ cancelArrowSearch();
+ analysisResults=[];analysisSection.hidden=true;
+ replayFen=null;replayLastMove=null;replayIndex=-1;replayMode="played";
+ tryMode=false;tryChess=null;showBestArrows=false;
+ $("best-arrows").checked=false;
+ document.body.classList.remove("analysis-mode");
+}
+
+$("undo").onclick=()=>{
+ cancelAnalysis();
+ cancelArrowSearch();
+ if(engineThinking&&engine){engine.postMessage("stop");engineThinking=false;}
+ if(chess.history().length){
+  chess.undo();
+  if(vsComputer&&chess.history().length)chess.undo();
+ }
+ const h=chess.history({verbose:true});
+ lastMove=h.length?h[h.length-1]:null;
+ selectedSquare=null;legalMoves=[];engineCandidates={};
+ clearAnalysis();render();
+};
+
+$("reset").onclick=()=>{
+ cancelAnalysis();cancelArrowSearch();
+ if(engineThinking&&engine)engine.postMessage("stop");
+ chess.reset();engineThinking=false;selectedSquare=null;legalMoves=[];
+ lastMove=null;engineCandidates={};clearAnalysis();render();
+};
+
+$("flip").onclick=()=>{
+ flipped=!flipped;
+ render();
+};
+
+engineButton.onclick=()=>{
+ vsComputer=!vsComputer;
+ engineLabel.textContent=vsComputer?"Computer AN":"Computer AUS";
+ engineButton.setAttribute("aria-pressed",String(vsComputer));
+ engineButton.classList.toggle("active",vsComputer);
+
+ if(!vsComputer&&engineThinking&&engine){
+  engine.postMessage("stop");engineThinking=false;
+ }
+ render();
+ if(vsComputer&&chess.turn()==="b")startEngineMove();
+};
+
+difficultySelect.onchange=()=>{
+ if(engineThinking&&engine){engine.postMessage("stop");engineThinking=false;}
+ if(vsComputer&&chess.turn()==="b")startEngineMove();
+};
+styleSelect.onchange=()=>{
+ if(engineThinking&&engine){engine.postMessage("stop");engineThinking=false;}
+ if(vsComputer&&chess.turn()==="b")startEngineMove();
+};
+
+/* ---------------- Eröffnungsbuch ---------------- */
+const openings=[
+ {
+  name:"Italienische Partie",
+  moves:["e4","e5","Nf3","Nc6","Bc4","Bc5","c3","Nf6"],
+  description:"Eine klassische offene Eröffnung. Weiß entwickelt den Läufer nach c4 und richtet den Blick auf das Feld f7. Häufig folgen ein ruhiger Aufbau mit d4 oder Pläne mit c3 und d4.",
+  notes:[
+   "Weiß besetzt das Zentrum und öffnet Linien für Läufer und Dame.",
+   "Schwarz antwortet ebenfalls mit einem Bauern im Zentrum.",
+   "Weiß entwickelt den Springer und greift den Bauern e5 an.",
+   "Schwarz entwickelt den Springer und verteidigt e5.",
+   "Der Läufer kommt aktiv nach c4 und nimmt f7 ins Visier.",
+   "Schwarz entwickelt den Läufer ebenfalls aktiv nach c5.",
+   "Weiß bereitet mit c3 den zentralen Vorstoß d4 vor.",
+   "Schwarz entwickelt den zweiten Springer und greift e4 an."
+  ]
+ },
+ {
+  name:"Spanische Partie",
+  moves:["e4","e5","Nf3","Nc6","Bb5","a6","Ba4","Nf6"],
+  description:"Die Spanische Partie (Ruy López) ist eine der bekanntesten Eröffnungen. Weiß entwickelt den Läufer nach b5 und übt indirekten Druck auf den Springer c6 aus, der den Bauern e5 unterstützt.",
+  notes:[
+   "Weiß nimmt Raum im Zentrum und öffnet die Diagonalen.",
+   "Schwarz besetzt ebenfalls das Zentrum.",
+   "Der Springer entwickelt sich mit Tempo gegen den Bauern e5.",
+   "Schwarz verteidigt e5 durch Entwicklung des Springers.",
+   "Der Läufer greift den Springer c6 an, der e5 unterstützt.",
+   "Schwarz fragt den Läufer mit a6 nach seiner Entscheidung.",
+   "Der Läufer zieht sich zurück und bleibt auf der Diagonale aktiv.",
+   "Schwarz entwickelt den zweiten Springer und greift e4 an."
+  ]
+ },
+ {
+  name:"Französische Verteidigung",
+  moves:["e4","e6","d4","d5","Nc3","Nf6","e5","Nfd7"],
+  description:"Die Französische Verteidigung ist eine solide Antwort auf 1. e4. Schwarz baut eine Bauernkette auf und kämpft gegen das weiße Zentrum. Die Stellung ist oft strategisch und von Bauernstrukturen geprägt.",
+  notes:[
+   "Weiß besetzt das Zentrum mit dem Königsbauern.",
+   "Schwarz bereitet den Vorstoß ...d5 vor und öffnet dem Läufer c8 eine Diagonale.",
+   "Weiß unterstützt e4 mit einem zweiten Zentralbauern.",
+   "Schwarz greift das weiße Zentrum direkt an.",
+   "Weiß entwickelt den Springer und unterstützt das Zentrum.",
+   "Schwarz entwickelt den Springer nach f6 und setzt e4 unter Druck.",
+   "Weiß schließt das Zentrum vorerst und gewinnt Raum.",
+   "Der Springer weicht nach d7 aus und kann später das Zentrum unterstützen."
+  ]
+ },
+ {
+  name:"Sizilianische Verteidigung",
+  moves:["e4","c5","Nf3","d6","d4","cxd4","Nxd4","Nf6"],
+  description:"Die Sizilianische Verteidigung ist eine dynamische Antwort auf 1. e4. Schwarz tauscht häufig den c-Bauern gegen den weißen d-Bauern und erhält dadurch asymmetrische Stellungen mit Chancen für beide Seiten.",
+  notes:[
+   "Weiß beansprucht das Zentrum und öffnet die Diagonalen.",
+   "Schwarz greift das Feld d4 von der Seite an und vermeidet eine symmetrische Stellung.",
+   "Weiß entwickelt den Springer und bereitet d4 vor.",
+   "Schwarz unterstützt den Druck auf das Zentrum und öffnet Entwicklungsmöglichkeiten.",
+   "Weiß spielt den zentralen Vorstoß d4.",
+   "Der c-Bauer schlägt den Bauern auf d4 und tauscht einen Flügelbauern gegen einen Zentralbauern.",
+   "Der Springer schlägt zurück und besetzt das zentrale Feld d4.",
+   "Schwarz entwickelt den Springer und greift e4 an."
+  ]
+ },
+ {
+  name:"Damengambit",
+  moves:["d4","d5","c4","e6","Nc3","Nf6","Bg5","Be7"],
+  description:"Das Damengambit beginnt mit einem Angebot des c-Bauern, um das Zentrum zu kontrollieren. Es ist kein echtes Bauernopfer, denn Schwarz kann den Bauern meist nicht ohne positionelle Zugeständnisse halten.",
+  notes:[
+   "Weiß besetzt das Zentrum mit dem Damenbauern.",
+   "Schwarz antwortet symmetrisch und kontrolliert ebenfalls das Zentrum.",
+   "Weiß bietet den c-Bauern an, um Druck auf d5 auszuüben.",
+   "Schwarz unterstützt den Bauern d5 und öffnet dem Läufer f8 den Weg.",
+   "Weiß entwickelt den Springer und verstärkt den Druck auf d5.",
+   "Schwarz entwickelt den Springer und kontrolliert zentrale Felder.",
+   "Weiß entwickelt den Läufer und bindet den Springer f6 an die Dame.",
+   "Schwarz löst die Fesselung durch Entwicklung des Läufers."
+  ]
+ }
+];
+
+let selectedOpening=null;
+let openingPly=0;
+let openingGame=null;
+
+function renderOpeningList(){
+ const list=$("opening-list");
+ list.innerHTML="";
+ openings.forEach((opening,index)=>{
+  const button=document.createElement("button");
+  button.type="button";
+  button.className="opening-choice";
+  const title=document.createElement("strong");
+  title.textContent=opening.name;
+  const detail=document.createElement("span");
+  detail.textContent=opening.description;
+  button.append(title,detail);
+  button.addEventListener("click",()=>openOpening(index));
+  list.appendChild(button);
+ });
+}
+
+function openOpening(index){
+ selectedOpening=openings[index];
+ openingPly=0;
+ $("opening-select").hidden=true;
+ $("opening-study").hidden=false;
+ $("opening-description").textContent=selectedOpening.description;
+ renderOpeningPosition();
+}
+
+function renderOpeningPosition(){
+ if(!selectedOpening)return;
+ openingGame=new Chess();
+ const played=[];
+ for(let i=0;i<openingPly;i++){
+  const move=openingGame.move(selectedOpening.moves[i]);
+  if(move)played.push(move);
+ }
+ const board=$("opening-board");
+ board.innerHTML="";
+ const position=openingGame.board();
+
+ position.forEach((row,r)=>{
+  row.forEach((piece,c)=>{
+   const square=document.createElement("div");
+   square.className="square "+((r+c)%2===0?"light":"dark");
+   if(piece)square.innerHTML=pieceSvg(piece);
+   board.appendChild(square);
+  });
+ });
+
+ const moveText=selectedOpening.moves.map((san,index)=>{
+  const moveNo=Math.floor(index/2)+1;
+  const text=(index%2===0?moveNo+". ":"")+san;
+  if(index===openingPly-1)return `<span class="opening-current">${text}</span>`;
+  return text;
+ });
+ $("opening-moves").innerHTML=moveText.length?moveText.join(" "):"Noch keine Züge gespielt.";
+ $("opening-status").textContent=openingPly===0?"Ausgangsstellung":`Nach ${openingPly} von ${selectedOpening.moves.length} Halbzügen · ${openingGame.turn()==="w"?"Weiß":"Schwarz"} ist am Zug`;
+ $("opening-prev").disabled=openingPly===0;
+ $("opening-next").disabled=openingPly>=selectedOpening.moves.length;
+
+ if(openingPly===0){
+  $("opening-explanation").textContent="Ausgangsstellung: Tippe auf „Weiter“, um mit dem ersten Zug der Eröffnung zu beginnen.";
+ }else{
+  $("opening-explanation").textContent=selectedOpening.notes[openingPly-1]||"";
+ }
+}
+
+$("opening-book-button").addEventListener("click",()=>{
+ $("opening-book").hidden=false;
+ $("opening-select").hidden=false;
+ $("opening-study").hidden=true;
+ renderOpeningList();
+});
+$("opening-close").addEventListener("click",()=>{$("opening-book").hidden=true;});
+$("opening-back-list").addEventListener("click",()=>{
+ $("opening-study").hidden=true;
+ $("opening-select").hidden=false;
+});
+$("opening-prev").addEventListener("click",()=>{
+ if(openingPly>0){openingPly--;renderOpeningPosition();}
+});
+$("opening-next").addEventListener("click",()=>{
+ if(selectedOpening&&openingPly<selectedOpening.moves.length){openingPly++;renderOpeningPosition();}
+});
+
+window.addEventListener("resize",()=>{
+ if(showBestArrows)drawBestArrow();
+});
+
+render();
+</script>
+</body>
+</html>
